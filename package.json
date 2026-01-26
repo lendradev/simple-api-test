@@ -4,8 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run index.ts",
-    "dev": "bun --watch index.ts"
+    "start": "./dist/app",
+    "dev": "bun --watch index.ts",
+    "compile": "bun build index.ts --outfile dist/app --target=bun --compile --minify"
   },
   "devDependencies": {
     "@types/bun": "latest"
