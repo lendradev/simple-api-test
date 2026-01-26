@@ -19,7 +19,8 @@ const server = Bun.serve({
         status: "alive",
         visitor_ip: clientIp,
         timestamp: new Date().toISOString(),
-        latency: responseTime // Internal processing time
+        latency: responseTime,
+        uptime: `${Math.floor((Date.now() - startTime) / 1000)} seconds`,
       });
     }
 
