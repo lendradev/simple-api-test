@@ -67,7 +67,7 @@ const server = Bun.serve({
       return new Response(stream, {
         headers: {
           "Content-Type": "application/json",
-          "Content-Encoding": "gzip",
+          "Content-Encoding": "br",
         },
       });
     }
