@@ -1,13 +1,6 @@
-# Dockerfile for a Bun-based app (multi-stage, small runtime)
-FROM oven/bun:alpine AS builder
+FROM oven/bun:alpine
 WORKDIR /app
-COPY package.json bun.lockb* ./
-RUN bun install --production
 COPY . .
-
-FROM oven/bun:alpine AS runtime
-WORKDIR /app
-COPY --from=builder /app /app
-ENV NODE_ENV=production
+RUN bun install
 EXPOSE 3000
 CMD ["bun", "run", "start"]
