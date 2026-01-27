@@ -1,18 +1,21 @@
-# multi-stage Dockerfile for a "staging" target
+# multi-stage, smaller final image (only runtime deps + built output)
 FROM oven/bun:alpine AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
-RUN bun install
+ENV NODE_ENV=production
+RUN bun install --production
 
 FROM deps AS build
 WORKDIR /app
 COPY . .
-# run build if you have a build script
 RUN bun run compile
 
 FROM oven/bun:alpine AS staging
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build app .
+# copy only runtime deps and built output
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
 EXPOSE 3000
-ENTRYPOINT [ "dist/app" ]
+# keep same entry (adjust if your artifact needs a runtime invocation)
+ENTRYPOINT ["dist/app"]
