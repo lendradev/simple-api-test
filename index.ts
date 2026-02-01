@@ -1,7 +1,24 @@
 const startTime = Date.now();
 
+
 const server = Bun.serve({
   port: 3000,
+  websocket: {
+    // Handler WebSocket
+    open(ws) {
+      console.log("Client terhubung via CF Tunnel");
+      ws.send("Halo dari Bun WebSocket server!");
+    },
+    message(ws, message) {
+      console.log(`Pesan: ${message}`);
+      ws.send(`Bun membalas: ${message}`);
+    },
+    close(ws) {
+      console.log("Koneksi ditutup");
+    },
+    // Fitur bawaan Bun untuk menjaga koneksi tetap hidup (Keep-alive)
+    idleTimeout: 60, // Detik
+  },
   fetch(req, server) {
     const start = performance.now();
     const url = new URL(req.url);
