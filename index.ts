@@ -18,6 +18,7 @@ const server = Bun.serve({
     },
     // Fitur bawaan Bun untuk menjaga koneksi tetap hidup (Keep-alive)
     idleTimeout: 60, // Detik
+    perMessageDeflate: true,
   },
   fetch(req, server) {
     const start = performance.now();
