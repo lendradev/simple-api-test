@@ -21,6 +21,10 @@ const server = Bun.serve({
     perMessageDeflate: true,
   },
   fetch(req, server) {
+    if (server.upgrade(req)) {
+      return;
+    }
+    
     const start = performance.now();
     const url = new URL(req.url);
 
