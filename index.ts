@@ -3,19 +3,32 @@ const startTime = Date.now();
 const server = Bun.serve({
   port: 3000,
   websocket: {
-    // Handler WebSocket
+    // Handler WebSocket (with latency logging)
     open(ws) {
+      (ws as any).connectedAt = performance.now();
       console.log("Client connected (WebSocket established)");
       ws.send("Hello from Bun WebSocket server!");
     },
     message(ws, message) {
-      console.log(`Received: ${message}`);
-      ws.send(`Bun replies: ${message}`);
+      const recvTime = performance.now();
+      const text = typeof message === "string" ? message : new TextDecoder().decode(message);
+      console.log(`Received: ${text}`);
+
+      const start = performance.now();
+      const processingMs = (performance.now() - start).toFixed(4);
+
+      const reply = `Bun replies: ${text} (processed=${processingMs}ms)`;
+      ws.send(reply);
+
+      const sinceConnectMs = ((recvTime - (ws as any).connectedAt) || 0).toFixed(4);
+      console.log(`Replied in ${processingMs}ms (since connect ${sinceConnectMs}ms)`);
     },
     close(ws) {
-      console.log("Connection closed");
+      const connectedAt = (ws as any).connectedAt;
+      const durationMs = connectedAt ? (performance.now() - connectedAt).toFixed(4) : "unknown";
+      console.log("Connection closed, duration:", `${durationMs}ms`);
     },
-    idleTimeout: 60, 
+    idleTimeout: 60,
     perMessageDeflate: true,
   },
   fetch(req, server) {
