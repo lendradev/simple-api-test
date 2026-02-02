@@ -1,40 +1,54 @@
 const startTime = Date.now();
 
-
 const server = Bun.serve({
   port: 3000,
   websocket: {
     // Handler WebSocket
     open(ws) {
-      console.log("Client terhubung via CF Tunnel");
-      ws.send("Halo dari Bun WebSocket server!");
+      console.log("Client connected (WebSocket established)");
+      ws.send("Hello from Bun WebSocket server!");
     },
     message(ws, message) {
-      console.log(`Pesan: ${message}`);
-      ws.send(`Bun membalas: ${message}`);
+      console.log(`Received: ${message}`);
+      ws.send(`Bun replies: ${message}`);
     },
     close(ws) {
-      console.log("Koneksi ditutup");
+      console.log("Connection closed");
     },
-    // Fitur bawaan Bun untuk menjaga koneksi tetap hidup (Keep-alive)
-    idleTimeout: 60, // Detik
+    idleTimeout: 60, 
     perMessageDeflate: true,
   },
   fetch(req, server) {
+    // ---------------------------------------------------------
+    // 1. UNIVERSAL UPGRADE CHECK (The Fix)
+    // Checks if the client is asking for WebSocket on ANY path.
+    // This prevents the "Expected 101" error if client hits "/" instead of "/ws"
+    // ---------------------------------------------------------
     if (server.upgrade(req)) {
-      return;
+      return; // Bun handles the 101 response automatically
     }
-    
+
+    // 2. Standard API Logic (HTTP)
     const start = performance.now();
     const url = new URL(req.url);
 
+    // Helper to get IP
     const getClientIp = () =>
       req.headers.get("cf-connecting-ip") ||
       req.headers.get("x-forwarded-for")?.split(",")[0] ||
       server.requestIP(req)?.address ||
       "unknown";
 
-    // Health, Time, and Uptime check
+    // --- ADD THIS DEBUG BLOCK ---
+    if (url.pathname === "/ws") {
+        console.log("❌ Upgrade failed!");
+        console.log("Method:", req.method);
+        console.log("Upgrade Header:", req.headers.get("Upgrade"));
+        console.log("Connection Header:", req.headers.get("Connection"));
+    }
+    // ----------------------------
+
+    // Route: Root "/" -> Return JSON with Brotli compression
     if (url.pathname === "/") {
       const clientIp = getClientIp();
 
@@ -42,7 +56,6 @@ const server = Bun.serve({
         status: "alive",
         visitor_ip: clientIp,
         timestamp: new Date().toISOString(),
-        latency: undefined, // we'll compute and log later
         uptime: `${Math.floor((Date.now() - startTime) / 1000)} seconds`,
       };
 
@@ -51,7 +64,7 @@ const server = Bun.serve({
       const encoded = encoder.encode(json);
       const originalBytes = encoded.byteLength;
 
-      // Create a source stream containing the JSON
+      // Stream Logic
       const source = new ReadableStream({
         start(controller) {
           controller.enqueue(encoded);
@@ -59,25 +72,17 @@ const server = Bun.serve({
         },
       });
 
-      // Counting transform to measure compressed bytes and log when done
       let compressedBytes = 0;
       const counting = new TransformStream({
         transform(chunk, controller) {
-          // chunk will be a Uint8Array for gzip output
-          const size =
-            chunk && typeof (chunk as any).byteLength === "number"
-              ? (chunk as Uint8Array).byteLength
-              : 0;
+          const size = chunk && chunk.byteLength ? chunk.byteLength : 0;
           compressedBytes += size;
           controller.enqueue(chunk);
         },
         flush() {
           const totalMs = (performance.now() - start).toFixed(4);
-          // Update payload latency for logs (not modifying the sent payload)
           console.log(
-            `[${new Date().toISOString()}] ${req.method} ${url.pathname} ip=${clientIp} original=${originalBytes}B compressed=${compressedBytes}B latency=${totalMs}ms uptime=${Math.floor(
-              (Date.now() - startTime) / 1000
-            )}s`
+            `[${new Date().toISOString()}] ${req.method} ${url.pathname} ip=${clientIp} original=${originalBytes}B compressed=${compressedBytes}B latency=${totalMs}ms`
           );
         },
       });
@@ -92,20 +97,17 @@ const server = Bun.serve({
           "Content-Encoding": "br",
         },
       });
+      
     }
 
-    // IP detection logic
+    // Route: IP Check
     if (url.pathname === "/ip") {
       const clientIp = getClientIp();
-      console.log(
-        `[${new Date().toISOString()}] ${req.method} ${url.pathname} ip=${clientIp}`
-      );
+      console.log(`[${new Date().toISOString()}] IP Check from ${clientIp}`);
       return Response.json({ ip: clientIp });
     }
 
-    console.log(
-      `[${new Date().toISOString()}] ${req.method} ${url.pathname} 404`
-    );
+    // Route: 404 Not Found
     return new Response("Not Found", { status: 404 });
   },
 });
